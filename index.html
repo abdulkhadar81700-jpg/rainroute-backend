@@ -65,7 +65,7 @@
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        // Initialize Map (Default view over India)
+        // Initialize Map
         var map = L.map('map').setView([16.5062, 80.6480], 6); 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19
@@ -73,10 +73,9 @@
 
         var markers = [];
 
-        // Handle Map Clicks to drop Start & End pins
+        // Handle Map Clicks
         map.on('click', function(e) {
             if (markers.length >= 2) {
-                // Clear old pins if they click a 3rd time to restart
                 for (var i = 0; i < markers.length; i++) {
                     map.removeLayer(markers[i]);
                 }
@@ -84,8 +83,6 @@
             }
             
             var label = markers.length === 0 ? "Start" : "Destination";
-            var color = markers.length === 0 ? "blue" : "red";
-            
             var marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map).bindPopup("<b>" + label + "</b>").openPopup();
             markers.push(marker);
             
@@ -94,7 +91,7 @@
             }
         });
 
-        // 📍 GPS Locate Me Logic
+        // GPS Locate Me Logic
         document.getElementById('locate-btn').addEventListener('click', function() {
             if (navigator.geolocation) {
                 this.innerHTML = "⏳ Locating..."; 
@@ -103,16 +100,14 @@
                     var lat = position.coords.latitude;
                     var lon = position.coords.longitude;
                     
-                    // Smoothly fly map to user's location
                     map.flyTo([lat, lon], 15, { animate: true, duration: 1.5 });
                     
-                    // Drop a pin showing their current location
                     L.marker([lat, lon]).addTo(map)
                         .bindPopup("<b>📍 You are here!</b>").openPopup();
                         
                     document.getElementById('locate-btn').innerHTML = "📍 Locate Me";
                 }, function(error) {
-                    alert("Could not get GPS location. Make sure location permissions are enabled on your phone/browser.");
+                    alert("Could not get GPS location. Make sure location permissions are enabled.");
                     document.getElementById('locate-btn').innerHTML = "📍 Locate Me";
                 });
             } else {
@@ -120,27 +115,24 @@
             }
         });
 
-        // 🚀 Send data to FastAPI Backend
+        // Send data to FastAPI Backend
         document.getElementById('analyze-btn').addEventListener('click', async function() {
             if (markers.length < 2) {
                 alert("Please drop both a Start and Destination pin on the map first!");
                 return;
             }
             
-            var operatorId = document.getElementById('operator-id').value || "Unknown_Operator";
             document.getElementById('results').innerHTML = "⏳ Analyzing telemetry and weather data...";
 
-            // Create payload for Python backend
+            // FIXED PAYLOAD: Now matching the exact format FastAPI is asking for
             var payload = {
-                operator_id: operatorId,
-                start_lat: markers[0].getLatLng().lat,
-                start_lng: markers[0].getLatLng().lng,
-                end_lat: markers[1].getLatLng().lat,
-                end_lng: markers[1].getLatLng().lng
+                waypoints: [
+                    { lat: markers[0].getLatLng().lat, lon: markers[0].getLatLng().lng },
+                    { lat: markers[1].getLatLng().lat, lon: markers[1].getLatLng().lng }
+                ]
             };
 
             try {
-                // Calls the Vercel Python route
                 const response = await fetch('/api/evaluate-corridor', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -151,7 +143,6 @@
                 
                 const data = await response.json();
                 
-                // Display the AI Matrix / Telemetry results
                 document.getElementById('results').innerHTML = "<b>✅ Analysis Complete:</b><br><pre style='white-space: pre-wrap; word-wrap: break-word;'>" + JSON.stringify(data, null, 2) + "</pre>";
                 
             } catch (error) {
