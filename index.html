@@ -9,7 +9,6 @@
         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Side Panel Styling */
         #ui-panel {
             position: absolute;
             top: 15px;
@@ -22,7 +21,6 @@
             max-width: 300px;
         }
         
-        /* GPS Button Styling */
         #locate-btn {
             position: absolute;
             top: 15px;
@@ -49,10 +47,8 @@
 </head>
 <body>
 
-    <!-- Locate Me Button -->
     <button id="locate-btn">📍 Locate Me</button>
 
-    <!-- Left UI Panel -->
     <div id="ui-panel">
         <h3 style="margin-top: 0;">RainRoute</h3>
         <input type="text" id="operator-id" placeholder="Enter Operator ID">
@@ -60,25 +56,18 @@
         <div id="results">Click the map to drop your Start and Destination pins.</div>
     </div>
 
-    <!-- Map Container -->
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        // Initialize Map
         var map = L.map('map').setView([16.5062, 80.6480], 6); 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
         var markers = [];
 
-        // Handle Map Clicks
         map.on('click', function(e) {
             if (markers.length >= 2) {
-                for (var i = 0; i < markers.length; i++) {
-                    map.removeLayer(markers[i]);
-                }
+                for (var i = 0; i < markers.length; i++) map.removeLayer(markers[i]);
                 markers = [];
             }
             
@@ -86,25 +75,17 @@
             var marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map).bindPopup("<b>" + label + "</b>").openPopup();
             markers.push(marker);
             
-            if(markers.length === 2) {
-                document.getElementById('results').innerHTML = "✅ Pins dropped! Ready to analyze.";
-            }
+            if(markers.length === 2) document.getElementById('results').innerHTML = "✅ Pins dropped! Ready to analyze.";
         });
 
-        // GPS Locate Me Logic
         document.getElementById('locate-btn').addEventListener('click', function() {
             if (navigator.geolocation) {
                 this.innerHTML = "⏳ Locating..."; 
-                
                 navigator.geolocation.getCurrentPosition(function(position) {
                     var lat = position.coords.latitude;
                     var lon = position.coords.longitude;
-                    
                     map.flyTo([lat, lon], 15, { animate: true, duration: 1.5 });
-                    
-                    L.marker([lat, lon]).addTo(map)
-                        .bindPopup("<b>📍 You are here!</b>").openPopup();
-                        
+                    L.marker([lat, lon]).addTo(map).bindPopup("<b>📍 You are here!</b>").openPopup();
                     document.getElementById('locate-btn').innerHTML = "📍 Locate Me";
                 }, function(error) {
                     alert("Could not get GPS location. Make sure location permissions are enabled.");
@@ -115,7 +96,6 @@
             }
         });
 
-        // Send data to FastAPI Backend
         document.getElementById('analyze-btn').addEventListener('click', async function() {
             if (markers.length < 2) {
                 alert("Please drop both a Start and Destination pin on the map first!");
@@ -124,7 +104,6 @@
             
             document.getElementById('results').innerHTML = "⏳ Analyzing telemetry and weather data...";
 
-            // Payload matches FastAPI backend
             var payload = {
                 waypoints: [
                     { lat: markers[0].getLatLng().lat, lon: markers[0].getLatLng().lng },
@@ -141,22 +120,39 @@
                 
                 if (!response.ok) throw new Error("Server returned " + response.status);
                 
-                const data = await response.json();
+                const rawData = await response.json();
                 
-                // Clean UI Formatting for Judges
-                let info = data.threat_level ? data : (data.analysis || data);
+                // -- NEW FIX: Force the text string to become a JSON object --
+                let info = rawData;
+                if (typeof info === 'string') {
+                    // Clean up any weird markdown the AI might have added
+                    info = info.replace(/```json/g, '').replace(/```/g, '').trim();
+                    try {
+                        info = JSON.parse(info);
+                    } catch(e) {
+                        console.log("Could not parse JSON string.");
+                    }
+                }
+                
+                // In case it's nested inside 'analysis'
+                info = info.analysis || info; 
                 
                 let cleanHTML = "<div style='font-size: 13.5px; line-height: 1.6; color: #333;'>";
                 cleanHTML += "<b style='color: #28a745; font-size: 15px;'>✅ Route Analysis Complete</b><hr style='margin: 8px 0; border: 0; border-top: 1px solid #ddd;'>";
 
-                if (info.threat_level) cleanHTML += "<b>🚨 Threat Level:</b> " + info.threat_level + "<br>";
-                if (info.primary_hazard) cleanHTML += "<b>⚠️ Hazard:</b> " + info.primary_hazard + "<br>";
-                if (info.choke_point_advice) cleanHTML += "<b>📍 Choke Point:</b> " + info.choke_point_advice + "<br>";
-                if (info.speed_recommendation) cleanHTML += "<b>🏎️ Speed:</b> " + info.speed_recommendation + "<br>";
-                if (info.detour_advice) cleanHTML += "<b>🗺️ Advice:</b> " + info.detour_advice + "<br>";
+                // Check if the data successfully parsed
+                if (info.threat_level) {
+                    cleanHTML += "<b>🚨 Threat Level:</b> " + info.threat_level + "<br>";
+                    cleanHTML += "<b>⚠️ Hazard:</b> " + (info.primary_hazard || "None") + "<br>";
+                    cleanHTML += "<b>📍 Choke Point:</b> " + (info.choke_point_advice || "Clear") + "<br>";
+                    cleanHTML += "<b>🏎️ Speed:</b> " + (info.speed_recommendation || "Normal") + "<br>";
+                    cleanHTML += "<b>🗺️ Advice:</b> " + (info.detour_advice || "Safe to proceed") + "<br>";
+                } else {
+                    // FALLBACK: If it STILL won't parse, just show the text so it isn't blank!
+                    cleanHTML += "<pre style='white-space: pre-wrap; word-wrap: break-word; font-size: 11px;'>" + JSON.stringify(info, null, 2) + "</pre>";
+                }
 
                 cleanHTML += "</div>";
-
                 document.getElementById('results').innerHTML = cleanHTML;
                 
             } catch (error) {
