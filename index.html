@@ -100,7 +100,7 @@
             document.getElementById('map').style.display = 'block';
 
             if (!map) {
-                map = L.map('map').setView([16.3067, 80.4365], 11); // Centered near Guntur/Vijayawada
+                map = L.map('map').setView([16.3067, 80.4365], 11); 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                     attribution: '&copy; OpenStreetMap' 
                 }).addTo(map);
@@ -120,7 +120,6 @@
 
         async function runCorridorAnalysis() {
             if (pts.length < 2) {
-                // AUTO-ASSIGN SAFE DEFAULT POINTS IF NONE CLICKED
                 pts = [
                     { lat: 16.3067, lng: 80.4365 },
                     { lat: 16.5062, lng: 80.6480 }
@@ -144,8 +143,8 @@
                     { lat: lat2, lon: lon2 }
                 ];
 
-                // LINKED DIRECTLY TO YOUR LIVE VERCEL CLOUD SERVER
-                let response = await fetch('https://rainroute-backend.vercel.app/api/evaluate-corridor', {
+                // RELATIVE PATH: Works instantly on any Vercel URL
+                let response = await fetch('/api/evaluate-corridor', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ waypoints: corridorWaypoints })
