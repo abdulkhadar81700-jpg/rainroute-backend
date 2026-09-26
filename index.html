@@ -1,166 +1,187 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RainRoute Dashboard</title>
+    <title>RainRoute: Advanced Telemetry Navigation</title>
+    <meta charset="utf-8" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
-        
-        #ui-panel {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 1000;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            max-width: 300px;
-        }
-        
-        #locate-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 1000;
-            padding: 12px 18px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            transition: 0.3s;
-        }
-        #locate-btn:hover { background: #0056b3; }
-
-        input, button { width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; }
-        #analyze-btn { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.3s;}
-        #analyze-btn:hover { background: #218838; }
-        #results { margin-top: 10px; font-size: 13px; color: #333; max-height: 300px; overflow-y: auto; }
+        body { margin: 0; display: flex; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; height: 100vh; overflow: hidden; }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 18, 18, 0.95); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+        .login-card { background: #1e1e1e; padding: 32px; border-radius: 12px; border: 1px solid #333; width: 360px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-card h2 { color: #38bdf8; margin-bottom: 8px; }
+        .login-card p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        .input-group label { display: block; font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 10px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: white; box-sizing: border-box; font-size: 14px; }
+        #sidebar { width: 420px; padding: 24px; background: #1e1e1e; height: 100vh; box-sizing: border-box; overflow-y: auto; border-right: 1px solid #333; display: none; }
+        #map { flex-grow: 1; height: 100vh; display: none; }
+        h2 { margin-top: 0; font-size: 20px; color: #38bdf8; }
+        .btn { width: 100%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; margin-top: 12px; }
+        .btn:hover { background: #0369a1; }
+        #status-card { margin-top: 20px; display: none; }
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+        .metric-box { background: #27272a; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #3f3f46; }
+        .metric-box span { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+        .metric-box b { font-size: 16px; color: #e2e8f0; }
+        .ai-card { background: #18181b; padding: 16px; border-radius: 6px; border: 1px solid #3f3f46; margin-bottom: 16px; }
+        .ai-card h3 { margin: 0 0 12px 0; font-size: 14px; color: #a78bfa; display: flex; justify-content: space-between; }
+        .ai-field { margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
+        .ai-field strong { color: #cbd5e1; }
+        .badge-low { color: #4ade80; }
+        .badge-moderate { color: #facc15; }
+        .badge-severe { color: #f97316; }
+        .badge-critical { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+        th, td { text-align: left; padding: 6px; border-bottom: 1px solid #333; }
+        th { color: #94a3b8; }
+        .user-banner { display: flex; justify-content: space-between; align-items: center; background: #27272a; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 12px; border: 1px solid #3f3f46; }
     </style>
 </head>
 <body>
-
-    <button id="locate-btn">📍 Locate Me</button>
-
-    <div id="ui-panel">
-        <h3 style="margin-top: 0;">RainRoute</h3>
-        <input type="text" id="operator-id" placeholder="Enter Operator ID">
-        <button id="analyze-btn">Analyze Route Options</button>
-        <div id="results">Click the map to drop your Start and Destination pins.</div>
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>RainRoute Portal</h2>
+            <p>Secure Enterprise Telemetry Login</p>
+            <div class="input-group">
+                <label>Operator ID / Email</label>
+                <input type="text" id="username" value="dispatcher@rainroute.ai" />
+            </div>
+            <div class="input-group">
+                <label>Security Clearance Key</label>
+                <input type="password" id="password" value="hackathon2026" />
+            </div>
+            <button class="btn" onclick="handleLogin()">Authenticate & Launch</button>
+        </div>
     </div>
 
+    <div id="sidebar">
+        <div class="user-banner">
+            <span>👤 <b id="display-user">Operator</b></span>
+            <span style="color: #4ade80;">● Secure Link</span>
+        </div>
+        <h2>RainRoute Telemetry</h2>
+        <p style="font-size: 13px; color: #94a3b8;">1. Click map for <b>Start</b> &nbsp;|&nbsp; 2. Click map for <b>Destination</b></p>
+        <button class="btn" onclick="runCorridorAnalysis()">Analyze Route Options</button>
+        
+        <div id="status-card">
+            <h3 id="risk-header" style="margin: 20px 0 10px 0; font-size: 15px;">Safest Route Risk: <span id="risk-score"></span>/100</h3>
+            <div class="metric-grid">
+                <div class="metric-box"><span>Peak Rain</span><b id="val-rain">--</b></div>
+                <div class="metric-box"><span>Peak Wind</span><b id="val-wind">--</b></div>
+                <div class="metric-box"><span>Min Vis</span><b id="val-vis">--</b></div>
+            </div>
+            <div class="ai-card">
+                <h3>AI Navigation Matrix <span id="threat-level"></span></h3>
+                <div class="ai-field"><strong>Primary Hazard:</strong> <span id="ai-hazard">--</span></div>
+                <div class="ai-field"><strong>Choke Point:</strong> <span id="ai-choke">--</span></div>
+                <div class="ai-field"><strong>Speed Matrix:</strong> <span id="ai-speed">--</span></div>
+                <div class="ai-field"><strong>Tactical Detour:</strong> <span id="ai-detour">--</span></div>
+            </div>
+            <h3 style="font-size: 14px; margin-bottom: 5px;">Safest Checkpoint Data</h3>
+            <table>
+                <thead><tr><th>Segment</th><th>Rain</th><th>Wind</th><th>Vis</th><th>Condition</th></tr></thead>
+                <tbody id="telemetry-table"></tbody>
+            </table>
+        </div>
+    </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([16.5062, 80.6480], 6); 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        let map, pts = [], markers = [], activePolylines = [];
 
-        var markers = [];
-
-        map.on('click', function(e) {
-            if (markers.length >= 2) {
-                for (var i = 0; i < markers.length; i++) map.removeLayer(markers[i]);
-                markers = [];
-            }
+        function handleLogin() {
+            let user = document.getElementById('username').value;
+            if(!user) return alert("Please enter Operator ID");
             
-            var label = markers.length === 0 ? "Start" : "Destination";
-            var marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map).bindPopup("<b>" + label + "</b>").openPopup();
-            markers.push(marker);
-            
-            if(markers.length === 2) document.getElementById('results').innerHTML = "✅ Pins dropped! Ready to analyze.";
-        });
+            document.getElementById('display-user').innerText = user.split('@')[0];
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('sidebar').style.display = 'block';
+            document.getElementById('map').style.display = 'block';
 
-        document.getElementById('locate-btn').addEventListener('click', function() {
-            if (navigator.geolocation) {
-                this.innerHTML = "⏳ Locating..."; 
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    var lat = position.coords.latitude;
-                    var lon = position.coords.longitude;
-                    map.flyTo([lat, lon], 15, { animate: true, duration: 1.5 });
-                    L.marker([lat, lon]).addTo(map).bindPopup("<b>📍 You are here!</b>").openPopup();
-                    document.getElementById('locate-btn').innerHTML = "📍 Locate Me";
-                }, function(error) {
-                    alert("Could not get GPS location. Make sure location permissions are enabled.");
-                    document.getElementById('locate-btn').innerHTML = "📍 Locate Me";
+            if (!map) {
+                map = L.map('map').setView([16.3067, 80.4365], 11); 
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                    attribution: '&copy; OpenStreetMap' 
+                }).addTo(map);
+
+                map.on('click', e => {
+                    if (pts.length >= 2) {
+                        pts = []; markers.forEach(m => map.removeLayer(m)); markers = [];
+                        activePolylines.forEach(p => map.removeLayer(p)); activePolylines = [];
+                        document.getElementById('status-card').style.display = 'none';
+                    }
+                    pts.push(e.latlng);
+                    markers.push(L.marker(e.latlng).addTo(map));
                 });
-            } else {
-                alert("GPS is not supported by your browser.");
             }
-        });
+            map.invalidateSize();
+        }
 
-        document.getElementById('analyze-btn').addEventListener('click', async function() {
-            if (markers.length < 2) {
-                alert("Please drop both a Start and Destination pin on the map first!");
-                return;
+        async function runCorridorAnalysis() {
+            if (pts.length < 2) {
+                pts = [
+                    { lat: 16.3067, lng: 80.4365 },
+                    { lat: 16.5062, lng: 80.6480 }
+                ];
+                markers.forEach(m => map.removeLayer(m)); markers = [];
+                pts.forEach(p => markers.push(L.marker([p.lat, p.lng]).addTo(map)));
             }
+
+            document.getElementById('status-card').style.display = 'block';
+            document.getElementById('risk-header').innerText = "Analyzing telemetry corridor...";
             
-            document.getElementById('results').innerHTML = "⏳ Analyzing telemetry and weather data...";
-
-            var payload = {
-                waypoints: [
-                    { lat: markers[0].getLatLng().lat, lon: markers[0].getLatLng().lng },
-                    { lat: markers[1].getLatLng().lat, lon: markers[1].getLatLng().lng }
-                ]
-            };
-
             try {
-                const response = await fetch('/api/evaluate-corridor', {
+                let lat1 = pts[0].lat, lon1 = pts[0].lng || pts[0].lon;
+                let lat2 = pts[1].lat, lon2 = pts[1].lng || pts[1].lon;
+                
+                let corridorWaypoints = [
+                    { lat: lat1, lon: lon1 },
+                    { lat: lat1 + (lat2 - lat1)*0.25, lon: lon1 + (lon2 - lon1)*0.25 },
+                    { lat: lat1 + (lat2 - lat1)*0.50, lon: lon1 + (lon2 - lon1)*0.50 },
+                    { lat: lat1 + (lat2 - lat1)*0.75, lon: lon1 + (lon2 - lon1)*0.75 },
+                    { lat: lat2, lon: lon2 }
+                ];
+
+                // RELATIVE PATH: Works instantly on any Vercel URL
+                let response = await fetch('/api/evaluate-corridor', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ waypoints: corridorWaypoints })
                 });
-                
-                if (!response.ok) throw new Error("Server returned " + response.status);
-                
-                const rawData = await response.json();
-                
-                let info = rawData;
-                
-                // STEP 1: If the data is inside "analysis", open that first
-                if (info.analysis) {
-                    info = info.analysis;
-                }
-                
-                // STEP 2: Now that it is open, if it is a text string, translate it into real data
-                if (typeof info === 'string') {
-                    info = info.replace(/```json/g, '').replace(/```/g, '').trim();
-                    try {
-                        info = JSON.parse(info);
-                    } catch(e) {
-                        console.log("Could not parse JSON string.");
-                    }
-                }
-                
-                let cleanHTML = "<div style='font-size: 13.5px; line-height: 1.6; color: #333;'>";
-                cleanHTML += "<b style='color: #28a745; font-size: 15px;'>✅ Route Analysis Complete</b><hr style='margin: 8px 0; border: 0; border-top: 1px solid #ddd;'>";
+                let result = await response.json();
 
-                // STEP 3: Display the clean data
-                if (info.threat_level) {
-                    cleanHTML += "<b>🚨 Threat Level:</b> " + info.threat_level + "<br>";
-                    cleanHTML += "<b>⚠️ Hazard:</b> " + (info.primary_hazard || "None") + "<br>";
-                    cleanHTML += "<b>📍 Choke Point:</b> " + (info.choke_point_advice || "Clear") + "<br>";
-                    cleanHTML += "<b>🏎️ Speed:</b> " + (info.speed_recommendation || "Normal") + "<br>";
-                    cleanHTML += "<b>🗺️ Advice:</b> " + (info.detour_advice || "Safe to proceed") + "<br>";
-                } else {
-                    cleanHTML += "<pre style='white-space: pre-wrap; word-wrap: break-word; font-size: 11px;'>" + JSON.stringify(info, null, 2) + "</pre>";
-                }
+                activePolylines.forEach(p => map.removeLayer(p));
+                activePolylines = [];
 
-                cleanHTML += "</div>";
-                document.getElementById('results').innerHTML = cleanHTML;
+                let line = L.polyline([[lat1, lon1], [lat2, lon2]], { color: result.is_safe ? '#22c55e' : '#ef4444', weight: 6 }).addTo(map);
+                activePolylines.push(line);
+                map.fitBounds(line.getBounds());
+
+                let corridorColor = result.is_safe ? '#22c55e' : '#ef4444';
+                document.getElementById('risk-header').innerHTML = `Safest Route Risk: <span style="color:${corridorColor}">${result.risk_score}</span>/100`;
+                document.getElementById('val-rain').innerText = result.max_rain_mm + " mm";
+                document.getElementById('val-wind').innerText = result.max_wind_kph + " kph";
+                document.getElementById('val-vis').innerText = result.min_vis_km + " km";
+
+                let ai = result.ai_guidance;
+                let tlClass = 'badge-' + (ai.threat_level || 'LOW').toLowerCase();
                 
-            } catch (error) {
-                document.getElementById('results').innerHTML = "<span style='color:red;'>⚠️ Error connecting to backend.</span>";
-                console.error("Fetch Error:", error);
+                document.getElementById('threat-level').innerHTML = `<span class="${tlClass}">[${ai.threat_level}]</span>`;
+                document.getElementById('ai-hazard').innerText = ai.primary_hazard;
+                document.getElementById('ai-choke').innerText = ai.choke_point_advisory;
+                document.getElementById('ai-speed').innerText = ai.speed_recommendation;
+                document.getElementById('ai-detour').innerText = ai.detour_advice;
+
+                let tbody = document.getElementById('telemetry-table');
+                tbody.innerHTML = '';
+                result.telemetry.forEach(t => {
+                    tbody.innerHTML += `<tr><td><b>${t.segment}</b></td><td>${t.rain_mm}</td><td>${t.wind_kph}</td><td>${t.vis_km}</td><td>${t.condition}</td></tr>`;
+                });
+            } catch (err) {
+                document.getElementById('risk-header').innerText = "Engine Error. Check Network or Console.";
             }
-        });
+        }
     </script>
 </body>
 </html>
