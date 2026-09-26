@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RainRoute: Advanced Telemetry Navigation</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body { margin: 0; display: flex; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; height: 100vh; overflow: hidden; }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(18, 18, 18, 0.95); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+        .login-card { background: #1e1e1e; padding: 32px; border-radius: 12px; border: 1px solid #333; width: 360px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-card h2 { color: #38bdf8; margin-bottom: 8px; }
+        .login-card p { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        .input-group label { display: block; font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 10px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: white; box-sizing: border-box; font-size: 14px; }
+        #sidebar { width: 420px; padding: 24px; background: #1e1e1e; height: 100vh; box-sizing: border-box; overflow-y: auto; border-right: 1px solid #333; display: none; }
+        #map { flex-grow: 1; height: 100vh; display: none; }
+        h2 { margin-top: 0; font-size: 20px; color: #38bdf8; }
+        .btn { width: 100%; padding: 12px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; margin-top: 12px; }
+        .btn:hover { background: #0369a1; }
+        #status-card { margin-top: 20px; display: none; }
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+        .metric-box { background: #27272a; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #3f3f46; }
+        .metric-box span { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+        .metric-box b { font-size: 16px; color: #e2e8f0; }
+        .ai-card { background: #18181b; padding: 16px; border-radius: 6px; border: 1px solid #3f3f46; margin-bottom: 16px; }
+        .ai-card h3 { margin: 0 0 12px 0; font-size: 14px; color: #a78bfa; display: flex; justify-content: space-between; }
+        .ai-field { margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
+        .ai-field strong { color: #cbd5e1; }
+        .badge-low { color: #4ade80; }
+        .badge-moderate { color: #facc15; }
+        .badge-severe { color: #f97316; }
+        .badge-critical { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+        th, td { text-align: left; padding: 6px; border-bottom: 1px solid #333; }
+        th { color: #94a3b8; }
+        .user-banner { display: flex; justify-content: space-between; align-items: center; background: #27272a; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 12px; border: 1px solid #3f3f46; }
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>RainRoute Portal</h2>
+            <p>Secure Enterprise Telemetry Login</p>
+            <div class="input-group">
+                <label>Operator ID / Email</label>
+                <input type="text" id="username" value="dispatcher@rainroute.ai" />
+            </div>
+            <div class="input-group">
+                <label>Security Clearance Key</label>
+                <input type="password" id="password" value="hackathon2026" />
+            </div>
+            <button class="btn" onclick="handleLogin()">Authenticate & Launch</button>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div class="user-banner">
+            <span>👤 <b id="display-user">Operator</b></span>
+            <span style="color: #4ade80;">● Secure Link</span>
+        </div>
+        <h2>RainRoute Telemetry</h2>
+        <p style="font-size: 13px; color: #94a3b8;">1. Click map for <b>Start</b> &nbsp;|&nbsp; 2. Click map for <b>Destination</b></p>
+        <button class="btn" onclick="runCorridorAnalysis()">Analyze Route Options</button>
+        
+        <div id="status-card">
+            <h3 id="risk-header" style="margin: 20px 0 10px 0; font-size: 15px;">Safest Route Risk: <span id="risk-score"></span>/100</h3>
+            <div class="metric-grid">
+                <div class="metric-box"><span>Peak Rain</span><b id="val-rain">--</b></div>
+                <div class="metric-box"><span>Peak Wind</span><b id="val-wind">--</b></div>
+                <div class="metric-box"><span>Min Vis</span><b id="val-vis">--</b></div>
+            </div>
+            <div class="ai-card">
+                <h3>AI Navigation Matrix <span id="threat-level"></span></h3>
+                <div class="ai-field"><strong>Primary Hazard:</strong> <span id="ai-hazard">--</span></div>
+                <div class="ai-field"><strong>Choke Point:</strong> <span id="ai-choke">--</span></div>
+                <div class="ai-field"><strong>Speed Matrix:</strong> <span id="ai-speed">--</span></div>
+                <div class="ai-field"><strong>Tactical Detour:</strong> <span id="ai-detour">--</span></div>
+            </div>
+            <h3 style="font-size: 14px; margin-bottom: 5px;">Safest Checkpoint Data</h3>
+            <table>
+                <thead><tr><th>Segment</th><th>Rain</th><th>Wind</th><th>Vis</th><th>Condition</th></tr></thead>
+                <tbody id="telemetry-table"></tbody>
+            </table>
+        </div>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        let map, pts = [], markers = [], activePolylines = [];
+
+        function handleLogin() {
+            let user = document.getElementById('username').value;
+            if(!user) return alert("Please enter Operator ID");
+            
+            document.getElementById('display-user').innerText = user.split('@')[0];
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('sidebar').style.display = 'block';
+            document.getElementById('map').style.display = 'block';
+
+            if (!map) {
+                map = L.map('map').setView([16.3067, 80.4365], 11); // Centered near Guntur/Vijayawada
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                    attribution: '&copy; OpenStreetMap' 
+                }).addTo(map);
+
+                map.on('click', e => {
+                    if (pts.length >= 2) {
+                        pts = []; markers.forEach(m => map.removeLayer(m)); markers = [];
+                        activePolylines.forEach(p => map.removeLayer(p)); activePolylines = [];
+                        document.getElementById('status-card').style.display = 'none';
+                    }
+                    pts.push(e.latlng);
+                    markers.push(L.marker(e.latlng).addTo(map));
+                });
+            }
+            map.invalidateSize();
+        }
+
+        async function runCorridorAnalysis() {
+            if (pts.length < 2) {
+                // AUTO-ASSIGN SAFE DEFAULT POINTS IF NONE CLICKED
+                pts = [
+                    { lat: 16.3067, lng: 80.4365 },
+                    { lat: 16.5062, lng: 80.6480 }
+                ];
+                markers.forEach(m => map.removeLayer(m)); markers = [];
+                pts.forEach(p => markers.push(L.marker([p.lat, p.lng]).addTo(map)));
+            }
+
+            document.getElementById('status-card').style.display = 'block';
+            document.getElementById('risk-header').innerText = "Analyzing telemetry corridor...";
+            
+            try {
+                let lat1 = pts[0].lat, lon1 = pts[0].lng || pts[0].lon;
+                let lat2 = pts[1].lat, lon2 = pts[1].lng || pts[1].lon;
+                
+                let corridorWaypoints = [
+                    { lat: lat1, lon: lon1 },
+                    { lat: lat1 + (lat2 - lat1)*0.25, lon: lon1 + (lon2 - lon1)*0.25 },
+                    { lat: lat1 + (lat2 - lat1)*0.50, lon: lon1 + (lon2 - lon1)*0.50 },
+                    { lat: lat1 + (lat2 - lat1)*0.75, lon: lon1 + (lon2 - lon1)*0.75 },
+                    { lat: lat2, lon: lon2 }
+                ];
+
+                // LINKED DIRECTLY TO YOUR LIVE VERCEL CLOUD SERVER
+                let response = await fetch('https://rainroute-backend.vercel.app/api/evaluate-corridor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ waypoints: corridorWaypoints })
+                });
+                let result = await response.json();
+
+                activePolylines.forEach(p => map.removeLayer(p));
+                activePolylines = [];
+
+                let line = L.polyline([[lat1, lon1], [lat2, lon2]], { color: result.is_safe ? '#22c55e' : '#ef4444', weight: 6 }).addTo(map);
+                activePolylines.push(line);
+                map.fitBounds(line.getBounds());
+
+                let corridorColor = result.is_safe ? '#22c55e' : '#ef4444';
+                document.getElementById('risk-header').innerHTML = `Safest Route Risk: <span style="color:${corridorColor}">${result.risk_score}</span>/100`;
+                document.getElementById('val-rain').innerText = result.max_rain_mm + " mm";
+                document.getElementById('val-wind').innerText = result.max_wind_kph + " kph";
+                document.getElementById('val-vis').innerText = result.min_vis_km + " km";
+
+                let ai = result.ai_guidance;
+                let tlClass = 'badge-' + (ai.threat_level || 'LOW').toLowerCase();
+                
+                document.getElementById('threat-level').innerHTML = `<span class="${tlClass}">[${ai.threat_level}]</span>`;
+                document.getElementById('ai-hazard').innerText = ai.primary_hazard;
+                document.getElementById('ai-choke').innerText = ai.choke_point_advisory;
+                document.getElementById('ai-speed').innerText = ai.speed_recommendation;
+                document.getElementById('ai-detour').innerText = ai.detour_advice;
+
+                let tbody = document.getElementById('telemetry-table');
+                tbody.innerHTML = '';
+                result.telemetry.forEach(t => {
+                    tbody.innerHTML += `<tr><td><b>${t.segment}</b></td><td>${t.rain_mm}</td><td>${t.wind_kph}</td><td>${t.vis_km}</td><td>${t.condition}</td></tr>`;
+                });
+            } catch (err) {
+                document.getElementById('risk-header').innerText = "Engine Error. Check Network or Console.";
+            }
+        }
+    </script>
+</body>
+</html>
