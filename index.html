@@ -122,10 +122,15 @@
                 
                 const rawData = await response.json();
                 
-                // -- NEW FIX: Force the text string to become a JSON object --
                 let info = rawData;
+                
+                // STEP 1: If the data is inside "analysis", open that first
+                if (info.analysis) {
+                    info = info.analysis;
+                }
+                
+                // STEP 2: Now that it is open, if it is a text string, translate it into real data
                 if (typeof info === 'string') {
-                    // Clean up any weird markdown the AI might have added
                     info = info.replace(/```json/g, '').replace(/```/g, '').trim();
                     try {
                         info = JSON.parse(info);
@@ -134,13 +139,10 @@
                     }
                 }
                 
-                // In case it's nested inside 'analysis'
-                info = info.analysis || info; 
-                
                 let cleanHTML = "<div style='font-size: 13.5px; line-height: 1.6; color: #333;'>";
                 cleanHTML += "<b style='color: #28a745; font-size: 15px;'>✅ Route Analysis Complete</b><hr style='margin: 8px 0; border: 0; border-top: 1px solid #ddd;'>";
 
-                // Check if the data successfully parsed
+                // STEP 3: Display the clean data
                 if (info.threat_level) {
                     cleanHTML += "<b>🚨 Threat Level:</b> " + info.threat_level + "<br>";
                     cleanHTML += "<b>⚠️ Hazard:</b> " + (info.primary_hazard || "None") + "<br>";
@@ -148,7 +150,6 @@
                     cleanHTML += "<b>🏎️ Speed:</b> " + (info.speed_recommendation || "Normal") + "<br>";
                     cleanHTML += "<b>🗺️ Advice:</b> " + (info.detour_advice || "Safe to proceed") + "<br>";
                 } else {
-                    // FALLBACK: If it STILL won't parse, just show the text so it isn't blank!
                     cleanHTML += "<pre style='white-space: pre-wrap; word-wrap: break-word; font-size: 11px;'>" + JSON.stringify(info, null, 2) + "</pre>";
                 }
 
